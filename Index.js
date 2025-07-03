@@ -1,7 +1,7 @@
 // server.js
 const express = require('express');
 const cors = require('cors');
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
 
 const app = express();
@@ -29,15 +29,32 @@ async function run() {
         const db = client.db('parcelDB');
         const parcelsCollection = db.collection('parcels');
 
-        // Test GET route
-        app.get('/', (req, res) => {
-            res.send('Parcel Delivery Server is running');
+        // Test parcelsCollection
+        app.get('/parcels', async (req, res) => {
+            const parcels = await parcelsCollection.find().toArray();
+            res.send(parcels);
         });
 
-        // Example POST route
+        //Parcels APi
+        app.get('/parcels', async (req, res) => {
+            const email = req.query.email;
+            const filter = email ? { created_by: email } : {};
+            const result = await parcels.find(filter).sort({ created_date: -1 }).toArray();
+            res.send(result);
+        });
+
+        // Example POST in parcelsCollection
+        // This endpoint allows you to add a new parcel to the database
         app.post('/parcels', async (req, res) => {
-            const parcel = req.body;
-            const result = await parcelsCollection.insertOne(parcel);
+            const newParcel = req.body;
+            const result = await parcelsCollection.insertOne(newParcel);
+            res.send(result);
+        });
+
+        // DELETE /parcels/:id
+        app.delete('/parcels/:id', async (req, res) => {
+            const id = req.params.id;
+            const result = await parcelsCollection.deleteOne({ _id: new ObjectId(id) });
             res.send(result);
         });
 
