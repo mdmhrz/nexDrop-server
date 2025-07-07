@@ -43,11 +43,12 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
 
+        //DB FOLDED AND COLLECTIONS
         const db = client.db('parcelDB');
         const parcelsCollection = db.collection('parcels');
         const paymentsCollection = db.collection('payments');
         const usersCollection = db.collection('users')
-        const trackingCollection = db.collection('trackings');
+        const trackingsCollection = db.collection('trackings');
         const ridersCollection = db.collection('riders')
 
         //Custom middlewares
@@ -77,7 +78,7 @@ async function run() {
 
         const verifyAdmin = async (req, res, next) => {
             const email = req.decoded?.email;
-            console.log(email);
+            // console.log(email);
             const query = { email };
             const user = await usersCollection.findOne(query);
             if (!user || user.role !== 'admin') {
@@ -91,7 +92,7 @@ async function run() {
 
         const verifyRider = async (req, res, next) => {
             const email = req.decoded?.email;
-            console.log(email);
+            // console.log(email);
             const query = { email };
             const user = await usersCollection.findOne(query);
             if (!user || user.role !== 'rider') {
@@ -99,6 +100,31 @@ async function run() {
             }
             next()
         }
+
+        // ******************************************//
+        // ******  Tracking Related APIs  ********//
+        // ******************************************//
+
+        //to get tracking by tracking id
+        app.get('/trackings/:trackingId', async (req, res) => {
+            const trackingId = req.params.trackingId;
+
+            const updates = await trackingsCollection
+                .find({ tracking_id: trackingId })
+                .sort({ timeStamp: 1 })
+                .toArray();
+            res.send(updates)
+        })
+
+
+        //post for tracking updates
+        app.post('/trackings', async (req, res) => {
+            const update = req.body;
+
+            update.timeStamp = new Date();
+            const result = await trackingsCollection.insertOne(update);
+            res.send(result);
+        });
 
 
 
@@ -225,6 +251,7 @@ async function run() {
                     {
                         $set: {
                             work_status: 'in_delivery'
+
                         }
                     }
                 );
@@ -245,12 +272,25 @@ async function run() {
         app.patch('/parcels/updateStatus', verifyFBToken, verifyRider, async (req, res) => {
             const { parcelId, status } = req.body;
 
+            const updatedDoc = {
+                delivery_status: status,
+            }
+
+            if (status === 'in_transit') {
+                updatedDoc.picked_at = new Date().toISOString()
+            }
+            else if (status === 'delivered') {
+                updatedDoc.delivered_at = new Date().toISOString()
+            }
+
             try {
                 const result = await parcelsCollection.updateOne(
                     { _id: new ObjectId(parcelId) },
-                    { $set: { delivery_status: status } }
+                    {
+                        $set: updatedDoc
+                    }
                 );
-
+                console.log(status);
                 res.send({ success: result.modifiedCount > 0 });
             } catch (error) {
                 console.error("Failed to update parcel status:", error);
@@ -267,7 +307,7 @@ async function run() {
                     { _id: new ObjectId(parcelId) },
                     {
                         $set: {
-                            cashout_status: 'requested',
+                            cashout_status: 'cashed_out',
                             cashout_requested_at: new Date()
                         }
                     }
@@ -553,7 +593,8 @@ async function run() {
             try {
                 const query = {
                     assigned_rider_email: email,
-                    delivery_status: { $in: ['delivered', 'delivered_to_center'] }
+                    delivery_status: { $in: ['delivered', 'delivered_to_center'] },
+
                 };
 
                 const options = {
@@ -602,7 +643,7 @@ async function run() {
                         }
                     }
                     const roleResult = await usersCollection.updateOne(userQuery, userUpdatedDoc)
-                    console.log(roleResult.modifiedCount);
+                    // console.log(roleResult.modifiedCount);
                 }
 
 
